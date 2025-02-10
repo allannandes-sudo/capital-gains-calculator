@@ -1,0 +1,62 @@
+
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // Plugin para criar um Fat JAR
+}
+
+group = 'com.capital'
+version = '1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21)) // Define Java 21
+    }
+}
+
+run {
+    standardInput = System.in // 🔥 Permite entrada no terminal ao rodar `./gradlew run`
+}
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Jackson para manipulação de JSON
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.0'
+
+    // Lombok para reduzir código repetitivo
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // JUnit 5 para testes
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+}
+
+application {
+    mainClass = 'com.capital.capital_gains_calculator.Main'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+
+tasks.named('jar') {
+    manifest {
+        attributes 'Main-Class': 'com.capital.capital_gains_calculator.Main'
+    }
+}
+
+tasks.register('fatJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier.set('all')
+    manifest {
+        attributes 'Main-Class': 'com.capital.capital_gains_calculator.Main'
+    }
+}
+
+tasks.build {
+    dependsOn fatJar
+}
