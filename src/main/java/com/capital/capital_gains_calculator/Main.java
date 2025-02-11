@@ -1,79 +1,75 @@
 package com.capital.capital_gains_calculator;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.capital.capital_gains_calculator.dto.Operation;
 import com.capital.capital_gains_calculator.dto.TaxResult;
-import com.capital.capital_gains_calculator.service.CapitalGainsCalculator;
 import com.capital.capital_gains_calculator.service.impl.CapitalGainsCalculatorImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 import static java.lang.System.*;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 public class Main {
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) {
-        CapitalGainsCalculator calculator = new CapitalGainsCalculatorImpl();
+        out.println("Iniciando a aplicação...");
+        out.println("Insira as operações no formato JSON e pressione Enter.");
+        out.println("(Windows → Ctrl+Z + Enter para finalizar / Linux/macOS → Ctrl+D para finalizar)");
 
-        try {
-            List<Operation> operations = loadOperations(args);
-            if (operations == null || operations.isEmpty()) {
-                err.println("Nenhuma operação válida encontrada.");
-                return;
+
+        String input = readInput(args);
+        List<String> jsonBlocks = Arrays.stream(input.split("]\\s*\n"))
+                .map(block -> block.trim() + "]")
+                .toList();
+
+        // 🔥 Define um pool de threads (ex: 4 threads simultâneas)
+        try (ExecutorService executor = newFixedThreadPool(4)) {
+            for (String block : jsonBlocks) {
+                executor.submit(() -> processBlock(block));
             }
+        }  // 🔥 Finaliza após concluir todas as execuções
+    }
 
-            List<TaxResult> results = calculator.processOperations(operations);
+    /**
+     * 🔥 Processa um bloco JSON como simulação independente.
+     */
+    static void processBlock(String jsonBlock) {
+        try {
+            List<Operation> operations = objectMapper.readValue(jsonBlock, new TypeReference<>() {});
+            List<TaxResult> results = new CapitalGainsCalculatorImpl().processOperations(operations);
+
+            // 🔥 Exibe cada simulação separadamente
             out.println(objectMapper.writeValueAsString(results));
 
         } catch (Exception e) {
-            err.println("Erro ao processar operações: " + e.getMessage());
+            err.println("Erro ao processar JSON: " + e.getMessage());
         }
     }
 
     /**
-     * Carrega as operações de um arquivo JSON ou do stdin.
+     * 🔥 Lê a entrada do arquivo ou do stdin.
      */
-    private static List<Operation> loadOperations(String[] args) throws IOException {
-        return (args.length > 0) ? readFromFile(args[0]) : readFromStdin();
-    }
+    static String readInput(String[] args) {
+        try (BufferedReader reader = args.length > 0
+                ? new BufferedReader(new FileReader(args[0]))
+                : new BufferedReader(new InputStreamReader(System.in))) {
 
-    /**
-     * Lê operações de um arquivo JSON.
-     */
-    private static List<Operation> readFromFile(String filePath) throws IOException {
-        File file = new File(filePath);
-        return (!file.exists()) ? logFileNotFound(filePath) : readFile(file);
-    }
+            return reader.lines().collect(Collectors.joining("\n"));
 
-    private static List<Operation> logFileNotFound(String filePath) {
-        err.println("Arquivo não encontrado: " + filePath);
-        return null;
-    }
-
-    private static List<Operation> readFile(File file) throws IOException {
-        out.println("Lendo operações do arquivo: " + file.getPath());
-        return objectMapper.readValue(file, new TypeReference<List<Operation>>() {});
-    }
-
-    /**
-     * Lê operações da entrada padrão (stdin).
-     */
-    private static List<Operation> readFromStdin() throws IOException {
-        out.println("Insira as operações no formato JSON e pressione Enter " +
-                "(Windows → Ctrl+Z + Enter para finalizar/ Linux/macOS → Ctrl+D para finalizar):");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        StringBuilder input = new StringBuilder();
-        String line;
-
-        while ((line = reader.readLine()) != null) {
-            input.append(line);
+        } catch (IOException e) {
+            err.println("Erro ao ler a entrada: " + e.getMessage());
+            return "";
         }
-        String inputData = input.toString();
-        out.println("Entrada Recebida: " + inputData);
-
-        return objectMapper.readValue(inputData, new TypeReference<List<Operation>>() {});
     }
 }

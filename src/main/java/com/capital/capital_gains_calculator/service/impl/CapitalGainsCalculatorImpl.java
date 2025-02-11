@@ -19,7 +19,7 @@ public class CapitalGainsCalculatorImpl implements CapitalGainsCalculator {
         List<TaxResult> taxResults = new ArrayList<>();
         int totalShares = 0;
         double weightedAverage = 0.0;
-        double accumulatedLoss = 0.0;
+        double[] accumulatedLoss = {0.0}; // Change accumulatedLoss to an array
 
         for (Operation op : operations) {
             out.println("Processing operation: " + op);
@@ -28,7 +28,7 @@ public class CapitalGainsCalculatorImpl implements CapitalGainsCalculator {
                     : weightedAverage;
 
             double tax = op.getOperation().equals("sell")
-                    ? processSellOperation(op, weightedAverage, accumulatedLoss)
+                    ? processSellOperation(op, weightedAverage, accumulatedLoss) // Pass accumulatedLoss as an array
                     : 0.0;
 
             totalShares += op.getOperation().equals("buy") ? op.getQuantity() : -op.getQuantity();
@@ -43,16 +43,20 @@ public class CapitalGainsCalculatorImpl implements CapitalGainsCalculator {
         return ((totalShares * weightedAverage) + (op.getQuantity() * op.getUnitCost())) / (totalShares + op.getQuantity());
     }
 
-    private double processSellOperation(Operation op, double weightedAverage, double accumulatedLoss) {
+    private double processSellOperation(Operation op, double weightedAverage, double[] accumulatedLoss) {
         out.println("Processing sell operation " + op);
         double totalSaleValue = op.getUnitCost() * op.getQuantity();
         double totalCost = weightedAverage * op.getQuantity();
         double profit = totalSaleValue - totalCost;
-        return (totalSaleValue > 20000.0) ? calculateTax(profit, accumulatedLoss) : 0.0;
+
+        if (profit < 0) {
+            accumulatedLoss[0] += Math.abs(profit);
+            return 0.0;
+        } else {
+            double taxableProfit = Math.max(0, profit - accumulatedLoss[0]);
+            accumulatedLoss[0] = Math.max(0, accumulatedLoss[0] - profit);
+            return (totalSaleValue > 20000.0) ? taxableProfit * 0.2 : 0.0;
+        }
     }
 
-    private double calculateTax(double profit, double accumulatedLoss) {
-        out.println("Calculating tax");
-        return (profit > 0) ? Math.max(0, (profit - accumulatedLoss) * 0.2) : 0.0;
-    }
 }
